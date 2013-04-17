@@ -1,0 +1,126 @@
+#!/bin/bash
+
+# Reset all variables that might be set
+file=""
+verbose=0
+origdir="$PWD"
+
+# this is the help string that will be shown if --help is triggered
+help="DupliFinder 0.1\n\n
+Copyleft (c) Luca Foschiani, Claudio Desideri\n\n
+---------------------------------------------\n\n
+Usage:\n
+duplifinder [-f -d -t] [--file FILE] [--directory DIRECTORY] [--threshold THRESHOLD] [--help]\n"
+
+#parameter parsing
+while :
+do
+	case $1 in
+		-h | --help | -\?)
+			echo -e $help
+			exit 0
+			;;
+		-f | --file)
+			file=$2
+			# checking if file is actually a correct file
+			if [ ! -f "$file" ]; then
+				echo "ERROR: FILE must be a valid text file. See --help" >&2
+				exit 1
+			fi
+			shift 2
+			;;
+		--file=*)
+			file=${1#*=}			# delete everything up till "="
+			if [ ! -f "$file" ]; then
+				echo "ERROR: FILE must be a valid text file. See --help" >&2
+				exit 1
+			fi
+			shift
+			;;
+		-d | --directory)
+			directory=$2
+			shift 2
+			;;
+		--directory=*)
+			directory=${1#*=}        # delete everything up till "="
+			shift
+			;;
+		-t | --threshold)
+			#FIXME: same as file above
+			threshold=$2
+			shift 2
+			;;
+		--threshold=*)
+			threshold=${1#*=}        # delete everything up till "="
+			shift
+			;;
+		
+		
+		--) # End of all options
+			shift
+			break
+			;;
+		-*)
+			echo "WARN: Unknown option (ignored): $1" >&2
+			shift
+			;;
+		*)  # no more options. Stop while loop
+			break
+			;;
+	esac
+done
+
+
+# file is needed. Exactly a text file is needed in input.
+if [ ! "$file" ]; then
+	echo "ERROR: option '--file FILE' not given. See --help" >&2
+	exit 1
+else
+	filetype=$(file --mime-type "$file" |grep text|wc -l)
+
+	if [ $filetype = 0 ] ; then
+		echo "ERROR: file is not recognized as text"
+		exit 1
+	else
+		filelength=$(wc -l "$file" | cut -d' ' -f1 )
+	fi
+fi
+
+# directory check and, eventually go to that directory
+if [ ! "$directory" ] ; then
+	# setting default value 
+	# (current directory)
+	directory=.
+else
+	if [ -d "$directory" ] ; then
+		cd "$directory"
+	fi
+fi
+
+if [ ! "$threshold" ] ; then
+	# setting default value 
+	# (file must be the same as the input file)
+	threshold=99
+fi
+
+# Rest of the program here.
+# If there are input files (for example) that follow the options, they.
+# will remain in the "$@" positional parameters.
+
+tree=$(find . -type f )
+
+# read one line each loop
+echo "$tree" | while read against
+do
+	if [ -f "$against" ]; then
+		similarity=$( comm -12 $file $against 2>/dev/null | wc -l )
+		ratio=$((($similarity*100/$filelength*100)/100))
+		if [ $ratio -ge $threshold ] ; then
+			echo -n "$against is "
+			echo -n "$ratio"
+			echo -e "% similar"
+		fi
+	fi
+done
+
+cd "$origdir" 

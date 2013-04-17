@@ -1,0 +1,134 @@
+\documentclass[a4paper,10pt]{article}
+\usepackage[utf8]{inputenc}
+
+\usepackage{listings}
+\usepackage{color}
+
+\definecolor{dkgreen}{rgb}{0,0.6,0}
+\definecolor{gray}{rgb}{0.5,0.5,0.5}
+\definecolor{mauve}{rgb}{0.58,0,0.82}
+
+\lstset{frame=tb,
+  language=Bash,
+  aboveskip=3mm,
+  belowskip=3mm,
+  showstringspaces=false,
+  columns=flexible,
+  basicstyle={\small\ttfamily},
+  numbers=none,
+  numberstyle=\tiny\color{gray},
+  keywordstyle=\color{blue},
+  commentstyle=\color{dkgreen},
+  stringstyle=\color{mauve},
+  breaklines=true,
+  breakatwhitespace=true
+  tabsize=3
+}
+
+%opening
+\title{Relazione su Duplifinder}
+\author{Claudio Desideri, Luca Foschiani}
+
+\begin{document}
+
+\maketitle
+
+
+\section{Obiettivi}
+Duplifinder ddovrà calcolare la similarità tra un file \textbf{FILE} e una serie di file in una directory \textbf{DIR}
+ in base alla soglia \textbf{THRESHOLD}.
+
+Lo script dovrà essere usabile, e quindi essere dotato di una funzione di help (richiamabile tramite parametro \textbf{--help}, nel caso l'utente sia insicuro sull'utilizzo,
+ o immetta un input sbagliato.
+
+Lo script dovrà occuparsi della gestione degli errori (es., opzioni o argomenti sbagliati)
+ e produrre output comprensibile (es., non stampando gli errori prodotti da singoli comandi).
+
+\section{Implementazione}
+All'inizio lo script si occupa della gestione dei parametri, fondamentali per la corretta esecuzione del software.
+Il codice comincia con un ciclo while, che si occupa di non scartare nessun caso possibile durante il parsing.
+Questo significa che il seguente comando:
+
+\begin{lstlisting}
+./duplifinder -f f1.txt -d tree -t 50
+\end{lstlisting}
+è equivalente a questo comando con l'ordine di parametri invertiti:
+\begin{lstlisting}
+./duplifinder -t 50 -d tree -f f1.txt
+\end{lstlisting}
+Il listato successivo invece si occupa di accertarsi della correttezza del file di input,
+che sia riconosciuto come file di testo:
+\begin{lstlisting}
+# file is needed. Exactly a text file is needed in input.
+if [ ! "$file" ]; then
+	echo "ERROR: option '--file FILE' not given. See --help" >&2
+	exit 1
+else
+	filetype=$(file --mime-type "$file" |grep text|wc -l)
+
+	if [ $filetype = 0 ] ; then
+		echo "ERROR: file is not recognized as text"
+		exit 1
+	else
+		filelength=$(wc -l "$file" | cut -d' ' -f1 )
+	fi
+fi
+\end{lstlisting}
+A seguire la porzione di codice che si occupa dell'esistenza e dell'effettiva caratteristica dell'essere cartella di un parametro
+ passato attraverso l'opzione \textbf{-d}:
+\begin{lstlisting}
+# directory check and, eventually go to that directory
+if [ ! "$directory" ] ; then
+	# setting default value 
+	# (current directory)
+	directory=.
+else
+	if [ -d "$directory" ] ; then
+		cd "$directory"
+	fi
+fi
+\end{lstlisting}
+Stesso dicasi per la soglia:
+\begin{lstlisting}
+if [ ! "$threshold" ] ; then
+	# setting default value 
+	# (file must be the same as the input file)
+	threshold=99
+fi
+\end{lstlisting}
+Successivamente, una volta gestito tutto l'input utente possiamo passare a calcolare gli effettivi valori che stavamo cercando, cioè la
+similarità tra \textbf{FILE} e i file contenuti in \textbf{DIR}. Cominciamo con l'ottenere tutta la lista di file interessati in una variabile
+tramite un comando \textbf{find} mirato:
+\begin{lstlisting}
+tree=$(find . -type f )
+\end{lstlisting}
+In seguito iteriamo per ogni file ottenuto e calcoliamo la similarità per riga grazie al comando \textbf{comm} e ad un po' di semplice matematica.
+Il tutto condito con le opportune istruzioni di output.
+\begin{lstlisting}
+# read one line each loop
+echo "$tree" | while read against
+do
+	if [ -f "$against" ]; then
+		similarity=$( comm -12 $file $against 2>/dev/null | wc -l )
+		ratio=$((($similarity*100/$filelength*100)/100))
+		if [ $ratio -ge $threshold ] ; then
+			echo -n "$against is "
+			echo -n "$ratio"
+			echo -e "% similar"
+		fi
+	fi
+done
+\end{lstlisting}
+Ultimo, ma non per importanza, torniamo nella cartella dalla quale lo script era stato chiamato.
+\begin{lstlisting}
+cd "$origdir" 
+\end{lstlisting}
+
+\section{Conclusioni}
+Lo script si comporta bene nei principali compiti che deve svolgere. Potrebbe effettivamente tornare utile nel caso in cui si debba fare
+una ricarca vasta tra file in cui cambiano principalmente le righe e non i singoli caratteri. Non potrebbe quindi essere impiegato
+come strumento per la correzione automatica di errori ortografici.
+
+Piuttosto potrebbe risultare utile come diff su larga scala su porzioni di codice e innumerevoli file sorgenti.
+
+\end{document}
