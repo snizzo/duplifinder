@@ -1,0 +1,1 @@
+A small shell script used to calculate similarity.
